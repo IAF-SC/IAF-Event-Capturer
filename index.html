@@ -55,27 +55,56 @@
 
 <script>
   // Replace with your Web App deployment URL from Step 1
-  const SCRIPT_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"; 
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHdq0vf6qgmn3YYF1SyCQTNlI9Qg3Bivh3yKMODbJaTpEd1wOL2Sy8kOA_QkWZb2mBmw/exec"; 
 
-  const cameraInput = document.getElementById("cameraInput");
-  const statusDiv = document.getElementById("status");
+const cameraInput = document.getElementById("cameraInput");
+const statusDiv = document.getElementById("status");
 
-  cameraInput.addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+cameraInput.addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    statusDiv.textContent = "Uploading photo...";
+  statusDiv.textContent = "Processing & compressing image...";
 
-    const reader = new FileReader();
-    reader.onload = function(evt) {
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      // Resize image to max 1600px width/height to stay safely under Google's 5MB payload limit
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+      const maxDim = 1600;
+
+      if (width > height && width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert compressed canvas to Base64 (0.8 quality JPEG)
+      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.8);
+
+      statusDiv.textContent = "Uploading to Drive...";
+
       const payload = {
-        file: evt.target.result,
+        file: compressedBase64,
         name: `DOC_${Date.now()}.jpg`,
-        mimeType: file.type
+        mimeType: "image/jpeg"
       };
 
+      // Use text post mode to avoid CORS pre-flight triggers
       fetch(SCRIPT_URL, {
         method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
@@ -87,13 +116,15 @@
         }
       })
       .catch(err => {
-        statusDiv.textContent = "❌ Error uploading file.";
-        console.error(err);
+        statusDiv.textContent = "❌ Error uploading file. Check Console.";
+        console.error("Upload error:", err);
       });
     };
+    img.src = evt.target.result;
+  };
 
-    reader.readAsDataURL(file);
-  });
+  reader.readAsDataURL(file);
+});
 </script>
 
 </body>
