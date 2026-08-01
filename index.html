@@ -53,8 +53,8 @@
 </div>
 
 <script>
-  // Replace with your Web App deployment URL
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHdq0vf6qgmn3YYF1SyCQTNlI9Qg3Bivh3yKMODbJaTpEd1wOL2Sy8kOA_QkWZb2mBmw/exec"; 
+  // Your deployed Web App URL ending in /exec
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmez2icd-yy_FkRWJjsXhVSd0FZzcRUAo4LV-fyAQDDPBVK_6FUS3OnYbO3LdVObFATg/exec"; 
 
   const cameraInput = document.getElementById("cameraInput");
   const statusDiv = document.getElementById("status");
@@ -63,7 +63,7 @@
     const file = e.target.files[0];
     if (!file) return;
 
-    statusDiv.textContent = "Requesting secure upload session...";
+    statusDiv.textContent = "Requesting direct upload slot...";
 
     try {
       // 1. Get temporary session upload URL from Apps Script
@@ -82,15 +82,15 @@
         throw new Error(sessionData.message || "Could not generate upload URL.");
       }
 
-      statusDiv.textContent = "Uploading raw full-res file directly to Drive...";
+      statusDiv.textContent = "Uploading full-res file directly to Drive...";
 
-      // 2. Upload file bytes DIRECTLY to Google Drive via session URL
+      // 2. Stream raw file directly to Google Drive via session URL (No Base64 splitting!)
       const driveUploadResponse = await fetch(sessionData.uploadUrl, {
         method: "PUT",
         headers: {
           "Content-Type": file.type || "image/jpeg"
         },
-        body: file // Sends raw file directly from browser memory
+        body: file
       });
 
       if (driveUploadResponse.ok) {
