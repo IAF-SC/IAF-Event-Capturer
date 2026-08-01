@@ -1,113 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event Snapper (Full Quality)</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f4f4f9;
-    }
-    .card {
-      background: #ffffff;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      text-align: center;
-      max-width: 320px;
-      width: 90%;
-    }
-    .btn {
-      background-color: #007bff;
-      color: white;
-      padding: 14px 24px;
-      font-size: 16px;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-block;
-      margin-top: 1rem;
-    }
-    #cameraInput { display: none; }
-    #status { margin-top: 1rem; font-weight: 500; font-size: 14px; }
-  </style>
-</head>
-<body>
-
-<div class="card">
-  <h2>Event Snapper</h2>
-  <p>Tap below to capture media. Uploads directly to Drive in full quality.</p>
-  
-  <input type="file" id="cameraInput" accept="image/*,video/*" capture="environment">
-  <label for="cameraInput" class="btn">📷 Take Photo / Video</label>
-
-  <div id="status"></div>
-</div>
-
 <script>
-  // Replace with your Web App URL ending in /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmez2icd-yy_FkRWJjsXhVSd0FZzcRUAo4LV-fyAQDDPBVK_6FUS3OnYbO3LdVObFATg/exec"; 
 
   const cameraInput = document.getElementById("cameraInput");
   const statusDiv = document.getElementById("status");
 
-  cameraInput.addEventListener("change", async function(e) {
+  cameraInput.addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    statusDiv.textContent = "Requesting direct upload slot...";
+    statusDiv.textContent = "Processing full-res media...";
 
-    try {
-      // Step 1: Get temporary session upload URL from Google Apps Script
-      const sessionResponse = await fetch(SCRIPT_URL, {
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      // Extract raw base64 data without canvas compression
+      const rawBase64 = evt.target.result.split(',')[1];
+
+      statusDiv.textContent = "Uploading to Drive...";
+
+      const payload = {
+        file: rawBase64,
+        name: `DOC_${Date.now()}_${file.name}`,
+        mimeType: file.type || "image/jpeg"
+      };
+
+      fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          name: `DOC_${Date.now()}_${file.name}`,
-          mimeType: file.type || "image/jpeg"
-        })
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "success") {
+          statusDiv.textContent = "✅ Upload complete! Saved in full quality.";
+        } else {
+          statusDiv.textContent = "❌ Upload failed: " + data.message;
+        }
+      })
+      .catch(err => {
+        statusDiv.textContent = "❌ Error uploading file.";
+        console.error("Upload error:", err);
+      })
+      .finally(() => {
+        cameraInput.value = "";
       });
+    };
 
-      const sessionData = await sessionResponse.json();
-
-      if (sessionData.status !== "success" || !sessionData.uploadUrl) {
-        throw new Error(sessionData.message || "Could not generate upload URL.");
-      }
-
-      statusDiv.textContent = "Uploading full-res file directly to Drive...";
-
-      // Step 2: Stream binary file directly to Google Drive (Bypasses 5MB limit!)
-      const driveUploadResponse = await fetch(sessionData.uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type || "image/jpeg"
-        },
-        body: file
-      });
-
-      if (driveUploadResponse.ok) {
-        statusDiv.textContent = "✅ Upload complete! Full resolution saved.";
-      } else {
-        statusDiv.textContent = "❌ Upload failed at Drive server.";
-      }
-
-    } catch (err) {
-      statusDiv.textContent = "❌ Error: " + err.message;
-      console.error(err);
-    } finally {
-      // Reset input so users can take another photo immediately
-      cameraInput.value = "";
-    }
+    reader.readAsDataURL(file);
   });
 </script>
-
-</body>
-</html>
