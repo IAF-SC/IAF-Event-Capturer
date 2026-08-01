@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quick Camera Upload</title>
+  <title>Event Snapper (Full Quality)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -37,94 +37,73 @@
       margin-top: 1rem;
     }
     #cameraInput { display: none; }
-    #status { margin-top: 1rem; font-weight: 500; }
+    #status { margin-top: 1rem; font-weight: 500; font-size: 14px; }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Event Snapper</h2>
-  <p>Tap below to take a photo. It will upload directly to Drive.</p>
+  <p>Tap below to capture media. Uploads directly to Drive in full quality.</p>
   
-  <!-- "capture=environment" forces mobile browsers to open the rear camera -->
-  <input type="file" id="cameraInput" accept="image/*" capture="environment">
-  <label for="cameraInput" class="btn">📷 Take Photo</label>
+  <input type="file" id="cameraInput" accept="image/*,video/*" capture="environment">
+  <label for="cameraInput" class="btn">📷 Take Photo / Video</label>
 
   <div id="status"></div>
 </div>
 
 <script>
-  // Replace with your Web App deployment URL from Step 1
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHdq0vf6qgmn3YYF1SyCQTNlI9Qg3Bivh3yKMODbJaTpEd1wOL2Sy8kOA_QkWZb2mBmw/exec"; 
+  // Replace with your Web App deployment URL
+  const SCRIPT_URL = "https://script.google.com/macros/library/d/1ETE5mPnXZkfjXaXZ4NDufhhTUa2mtb-fXrE5OiPLyBwiSFSUDvcGswEe/2"; 
 
-const cameraInput = document.getElementById("cameraInput");
-const statusDiv = document.getElementById("status");
+  const cameraInput = document.getElementById("cameraInput");
+  const statusDiv = document.getElementById("status");
 
-cameraInput.addEventListener("change", function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  cameraInput.addEventListener("change", async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  statusDiv.textContent = "Processing & compressing image...";
+    statusDiv.textContent = "Requesting secure upload session...";
 
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    const img = new Image();
-    img.onload = function() {
-      // Resize image to max 1600px width/height to stay safely under Google's 5MB payload limit
-      const canvas = document.createElement("canvas");
-      let width = img.width;
-      let height = img.height;
-      const maxDim = 1600;
+    try {
+      // 1. Get temporary session upload URL from Apps Script
+      const sessionResponse = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          name: `DOC_${Date.now()}_${file.name}`,
+          mimeType: file.type || "image/jpeg"
+        })
+      });
 
-      if (width > height && width > maxDim) {
-        height = Math.round((height * maxDim) / width);
-        width = maxDim;
-      } else if (height > maxDim) {
-        width = Math.round((width * maxDim) / height);
-        height = maxDim;
+      const sessionData = await sessionResponse.json();
+
+      if (sessionData.status !== "success" || !sessionData.uploadUrl) {
+        throw new Error(sessionData.message || "Could not generate upload URL.");
       }
 
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
+      statusDiv.textContent = "Uploading raw full-res file directly to Drive...";
 
-      // Convert compressed canvas to Base64 (0.8 quality JPEG)
-      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.8);
-
-      statusDiv.textContent = "Uploading to Drive...";
-
-      const payload = {
-        file: compressedBase64,
-        name: `DOC_${Date.now()}.jpg`,
-        mimeType: "image/jpeg"
-      };
-
-      // Use text post mode to avoid CORS pre-flight triggers
-      fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "success") {
-          statusDiv.textContent = "✅ Upload complete!";
-        } else {
-          statusDiv.textContent = "❌ Upload failed: " + data.message;
-        }
-      })
-      .catch(err => {
-        statusDiv.textContent = "❌ Error uploading file. Check Console.";
-        console.error("Upload error:", err);
+      // 2. Upload file bytes DIRECTLY to Google Drive via session URL
+      const driveUploadResponse = await fetch(sessionData.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "image/jpeg"
+        },
+        body: file // Sends raw file directly from browser memory
       });
-    };
-    img.src = evt.target.result;
-  };
 
-  reader.readAsDataURL(file);
-});
+      if (driveUploadResponse.ok) {
+        statusDiv.textContent = "✅ Upload complete! Full resolution saved.";
+      } else {
+        statusDiv.textContent = "❌ Upload failed at Drive server.";
+      }
+
+    } catch (err) {
+      statusDiv.textContent = "❌ Error: " + err.message;
+      console.error(err);
+    }
+  });
 </script>
 
 </body>
