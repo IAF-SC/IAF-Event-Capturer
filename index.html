@@ -53,7 +53,7 @@
 </div>
 
 <script>
-  // Your deployed Web App URL ending in /exec
+  // Replace with your Web App URL ending in /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmez2icd-yy_FkRWJjsXhVSd0FZzcRUAo4LV-fyAQDDPBVK_6FUS3OnYbO3LdVObFATg/exec"; 
 
   const cameraInput = document.getElementById("cameraInput");
@@ -66,7 +66,7 @@
     statusDiv.textContent = "Requesting direct upload slot...";
 
     try {
-      // 1. Get temporary session upload URL from Apps Script
+      // Step 1: Get temporary session upload URL from Google Apps Script
       const sessionResponse = await fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -84,7 +84,7 @@
 
       statusDiv.textContent = "Uploading full-res file directly to Drive...";
 
-      // 2. Stream raw file directly to Google Drive via session URL (No Base64 splitting!)
+      // Step 2: Stream binary file directly to Google Drive (Bypasses 5MB limit!)
       const driveUploadResponse = await fetch(sessionData.uploadUrl, {
         method: "PUT",
         headers: {
@@ -102,6 +102,9 @@
     } catch (err) {
       statusDiv.textContent = "❌ Error: " + err.message;
       console.error(err);
+    } finally {
+      // Reset input so users can take another photo immediately
+      cameraInput.value = "";
     }
   });
 </script>
