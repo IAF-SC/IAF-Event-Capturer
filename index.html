@@ -24,19 +24,28 @@
       max-width: 320px;
       width: 90%;
     }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 1rem;
+    }
     .btn {
       background-color: #007bff;
       color: white;
-      padding: 14px 24px;
+      padding: 14px 20px;
       font-size: 16px;
       font-weight: bold;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       display: inline-block;
-      margin-top: 1rem;
+      text-align: center;
     }
-    #cameraInput { display: none; }
+    .btn-video {
+      background-color: #28a745;
+    }
+    .hidden-input { display: none; }
     #status { margin-top: 1rem; font-weight: 500; font-size: 14px; }
   </style>
 </head>
@@ -44,10 +53,17 @@
 
 <div class="card">
   <h2>Event Snapper</h2>
-  <p>Tap below to capture media. Uploads directly to Drive in full quality.</p>
+  <p>Tap below to capture media directly to Drive in full quality.</p>
   
-  <input type="file" id="cameraInput" accept="image/*,video/*" capture="environment">
-  <label for="cameraInput" class="btn">📷 Take Photo / Video</label>
+  <div class="btn-group">
+    <!-- Photo Input (Opens Photo Camera Direct) -->
+    <input type="file" id="photoInput" class="hidden-input" accept="image/*" capture="environment">
+    <label for="photoInput" class="btn">📷 Take Photo</label>
+
+    <!-- Video Input (Opens Video Camera Direct) -->
+    <input type="file" id="videoInput" class="hidden-input" accept="video/*" capture="environment">
+    <label for="videoInput" class="btn btn-video">🎥 Record Video</label>
+  </div>
 
   <div id="status"></div>
 </div>
@@ -55,18 +71,18 @@
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmez2icd-yy_FkRWJjsXhVSd0FZzcRUAo4LV-fyAQDDPBVK_6FUS3OnYbO3LdVObFATg/exec"; 
 
-  const cameraInput = document.getElementById("cameraInput");
+  const photoInput = document.getElementById("photoInput");
+  const videoInput = document.getElementById("videoInput");
   const statusDiv = document.getElementById("status");
 
-  cameraInput.addEventListener("change", function(e) {
-    const file = e.target.files[0];
+  function handleFileUpload(inputElement) {
+    const file = inputElement.files[0];
     if (!file) return;
 
     statusDiv.textContent = "Processing full-res media...";
 
     const reader = new FileReader();
     reader.onload = function(evt) {
-      
       const rawBase64 = evt.target.result.split(',')[1];
 
       statusDiv.textContent = "Uploading to Drive...";
@@ -95,10 +111,16 @@
         console.error("Upload error:", err);
       })
       .finally(() => {
-        cameraInput.value = "";
+        inputElement.value = "";
       });
     };
 
     reader.readAsDataURL(file);
-  });
+  }
+
+  photoInput.addEventListener("change", function() { handleFileUpload(this); });
+  videoInput.addEventListener("change", function() { handleFileUpload(this); });
 </script>
+
+</body>
+</html>
